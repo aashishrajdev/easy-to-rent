@@ -1,131 +1,170 @@
-const API_URL = 'http://localhost:5000/api';
+// src/services/api.ts
+const API_BASE_URL = 'https://eassy-to-rent-backend.onrender.com';
 
-export interface PGListing {
-  _id: string;
-  slug?: string;
-  name: string;
-  address: string;
-  price: number;
-  type: 'boys' | 'girls' | 'co-ed';
-  rating: number;
-  reviewCount: number;
-  description: string;
-  images: string[];
-  amenities: string[];
-  roomTypes?: Array<{
-    type: string;
-    price: number;
-    available: number;
-    description?: string;
-  }>;
-  distance: string;
-  availability: 'available' | 'limited' | 'full';
-  verified: boolean;
-  featured: boolean;
-  published: boolean;
-  ownerName: string;
-  ownerPhone: string;
-  ownerEmail: string;
-  createdAt: string;
-  updatedAt: string;
+// Try different possible endpoint patterns
+const ENDPOINTS = {
+  // Try these common patterns
+  LOGIN: '/api/auth/login',     // Your current attempt
+  LOGIN_ALT1: '/api/login',      // Alternative 1
+  LOGIN_ALT2: '/auth/login',     // Alternative 2
+  LOGIN_ALT3: '/api/users/login', // Alternative 3
+  LOGIN_ALT4: '/login',           // Alternative 4
+  
+  REGISTER: '/api/auth/register',
+  REGISTER_ALT1: '/api/register',
+  REGISTER_ALT2: '/auth/register',
+  
+  USER: '/api/auth/me',
+  USER_ALT1: '/api/user',
+  USER_ALT2: '/auth/me',
 }
 
-class PGService {
-  async getListings(filters?: {
-    type?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    search?: string;
-    published?: boolean;
-  }): Promise<PGListing[]> {
-    const params = new URLSearchParams();
-    
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          params.append(key, value.toString());
-        }
-      });
-    }
-    
-    const queryString = params.toString();
-    const url = `${API_URL}/pg${queryString ? `?${queryString}` : ''}`;
-    
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch listings: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    return result.data || result;
+export class ApiService {
+  private token: string | null = null;
+  private baseURL: string;
+
+  constructor() {
+    this.baseURL = API_BASE_URL;
   }
 
-  async getListing(idOrSlug: string): Promise<PGListing> {
-    const response = await fetch(`${API_URL}/pg/${idOrSlug}`);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch listing: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    return result.data || result;
+  setToken(token: string) {
+    this.token = token;
+    localStorage.setItem('auth_token', token);
   }
 
-  async createListing(listingData: Partial<PGListing>) {
-    const token = localStorage.getItem('token');
-    
-    const response = await fetch(`${API_URL}/pg`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(listingData)
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to create listing: ${response.status}`);
+  getToken(): string | null {
+    if (!this.token) {
+      this.token = localStorage.getItem('auth_token');
     }
-    
-    return await response.json();
+    return this.token;
   }
 
-  async updateListing(id: string, listingData: Partial<PGListing>) {
-    const token = localStorage.getItem('token');
-    
-    const response = await fetch(`${API_URL}/pg/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(listingData)
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to update listing: ${response.status}`);
-    }
-    
-    return await response.json();
+  clearToken() {
+    this.token = null;
+    localStorage.removeItem('auth_token');
   }
 
-  async deleteListing(id: string) {
-    const token = localStorage.getItem('token');
-    
-    const response = await fetch(`${API_URL}/pg/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`
+  // Generic request method
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<T> {
+    const url = `${this.baseURL}${endpoint}`;
+    const token = this.getToken();
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...options.headers,
+    };
+
+    console.log('Making request to:', url); // For debugging
+
+    const config: RequestInit = {
+      ...options,
+      headers,
+      mode: 'cors', // Important for CORS
+      credentials: 'include', // Include cookies if needed
+    };
+
+    try {
+      const response = await fetch(url, config);
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('API Error Response:', data); // For debugging
+        throw new Error(data.message || data.error || 'Request failed');
       }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to delete listing: ${response.status}`);
+
+      return data as T;
+    } catch (error) {
+      console.error('API Request Error:', error);
+      throw error;
+    }
+  }
+
+  // Try multiple endpoints for login
+  async login(credentials: { email: string; password: string }) {
+    const endpoints = [
+      '/api/auth/login',
+      '/api/login',
+      '/auth/login', 
+      '/api/users/login',
+      '/login'
+    ];
+
+    let lastError = null;
+
+    // Try each endpoint until one works
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying login endpoint: ${endpoint}`);
+        const response = await this.request<any>(endpoint, {
+          method: 'POST',
+          body: JSON.stringify(credentials),
+        });
+
+        // Check different response structures
+        if (response.token || response.data?.token || response.access_token) {
+          const token = response.token || response.data?.token || response.access_token;
+          const user = response.user || response.data?.user || response.data;
+          
+          this.setToken(token);
+          
+          return {
+            success: true,
+            data: {
+              token,
+              user: user || { email: credentials.email }
+            }
+          };
+        }
+        
+        // If we got here but no token, maybe structure is different
+        if (response.success || response.status === 'success') {
+          return {
+            success: true,
+            data: response.data || response
+          };
+        }
+
+        lastError = new Error('Invalid response structure');
+      } catch (error) {
+        console.log(`Endpoint ${endpoint} failed:`, error);
+        lastError = error;
+        // Continue to next endpoint
+      }
+    }
+
+    // If all endpoints failed
+    throw lastError || new Error('Login failed on all endpoints');
+  }
+
+  // Test endpoint to check API structure
+  async testConnection() {
+    const testEndpoints = [
+      '/api/health',
+      '/health',
+      '/api/test',
+      '/'
+    ];
+
+    for (const endpoint of testEndpoints) {
+      try {
+        const response = await fetch(`${this.baseURL}${endpoint}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`API test successful at ${endpoint}:`, data);
+          return { success: true, endpoint, data };
+        }
+      } catch (error) {
+        console.log(`Test endpoint ${endpoint} failed`);
+      }
     }
     
-    return await response.json();
+    return { success: false, message: 'Could not connect to API' };
   }
 }
 
-export const pgService = new PGService();
+export const api = new ApiService();

@@ -1,198 +1,567 @@
-import { useState } from 'react';
-import { X, Mail, Lock, User, Phone, Loader2 } from 'lucide-react';
+// src/components/auth/LoginModal.tsx
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { Loader2, Eye, EyeOff, Mail, Lock, User, Phone, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  defaultTab?: 'login' | 'register';
 }
 
-export const LoginModal = ({ isOpen, onClose, onSuccess }: LoginModalProps) => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  phone?: string;
+}
+
+const LoginModal: React.FC<LoginModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  defaultTab = 'login' 
+}) => {
+  const { login: authLogin, register: authRegister } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>(defaultTab);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Login form state
+  const [loginData, setLoginData] = useState({
+    email: '',
+    password: ''
+  });
+
+  // Register form state
+  const [registerData, setRegisterData] = useState({
     name: '',
     email: '',
     password: '',
-    phone: '',
+    confirmPassword: '',
+    phone: ''
   });
 
-  const { login, register } = useAuth();
+  const [registerErrors, setRegisterErrors] = useState<Record<string, string>>({});
 
-  if (!isOpen) return null;
+  // Handle login form input changes
+  const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLoginData({
+      ...loginData,
+      [e.target.name]: e.target.value
+    });
+    if (error) setError(null);
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle register form input changes
+  const handleRegisterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRegisterData({
+      ...registerData,
+      [e.target.name]: e.target.value
+    });
+    if (registerErrors[e.target.name]) {
+      setRegisterErrors({
+        ...registerErrors,
+        [e.target.name]: ''
+      });
+    }
+    if (error) setError(null);
+  };
+
+  // Validate register form
+  const validateRegister = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!registerData.name.trim()) {
+      errors.name = 'Name is required';
+    } else if (registerData.name.length < 2) {
+      errors.name = 'Name must be at least 2 characters';
+    }
+
+    if (!registerData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(registerData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    if (!registerData.password) {
+      errors.password = 'Password is required';
+    } else if (registerData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    }
+
+    if (registerData.password !== registerData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (registerData.phone && !/^\d{10}$/.test(registerData.phone.replace(/\D/g, ''))) {
+      errors.phone = 'Phone number must be 10 digits';
+    }
+
+    setRegisterErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // CORRECTED LOGIN FUNCTION - Using the exact endpoint from your backend
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      if (isLogin) {
-        await login(formData.email, formData.password);
+      console.log('Attempting login with:', loginData.email);
+      
+      // Your backend is running on Render
+      const API_URL = 'https://eassy-to-rent-backend.onrender.com';
+      
+      // Based on your backend code, the correct endpoint is /api/auth/login
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          email: loginData.email,
+          password: loginData.password
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Login response:', data);
+
+      // Check if login was successful based on your backend response structure
+      if (response.ok && data.success) {
+        // Extract user data from the response
+        // Based on your database, the user data should be in data.data or data.user
+        const userData = data.data || data.user;
+        
+        if (userData && data.token) {
+          // Store token and user data
+          localStorage.setItem('auth_token', data.token);
+          localStorage.setItem('user', JSON.stringify({
+            id: userData._id || userData.id,
+            name: userData.name,
+            email: userData.email,
+            role: userData.role,
+            phone: userData.phone
+          }));
+          
+          // Call auth context login
+          if (authLogin) {
+            await authLogin(data.token, userData);
+          }
+          
+          toast.success('Login successful!', {
+            description: `Welcome back, ${userData.name || 'User'}!`,
+          });
+          
+          onClose();
+          setLoginData({ email: '', password: '' });
+        } else {
+          throw new Error('Invalid response structure');
+        }
       } else {
-        await register(formData.name, formData.email, formData.password, formData.phone);
+        // Handle error response
+        throw new Error(data.message || data.error || 'Login failed');
       }
       
-      // Reset form
-      setFormData({
-        name: '',
-        email: '',
-        password: '',
-        phone: '',
+    } catch (error: any) {
+      console.error('Login error:', error);
+      setError(error.message || 'Login failed. Please check your credentials.');
+      toast.error('Login failed', {
+        description: error.message || 'Please check your email and password'
       });
-      
-      onClose();
-      if (onSuccess) onSuccess();
-      
-    } catch (error) {
-      // Error is already handled in auth context
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
+  // REGISTER FUNCTION
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateRegister()) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const API_URL = 'https://eassy-to-rent-backend.onrender.com';
+      
+      const response = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          name: registerData.name,
+          email: registerData.email,
+          password: registerData.password,
+          phone: registerData.phone || undefined
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Register response:', data);
+
+      if (response.ok && data.success) {
+        const userData = data.data || data.user;
+        
+        if (userData && data.token) {
+          localStorage.setItem('auth_token', data.token);
+          localStorage.setItem('user', JSON.stringify({
+            id: userData._id || userData.id,
+            name: userData.name,
+            email: userData.email,
+            role: userData.role,
+            phone: userData.phone
+          }));
+          
+          if (authRegister) {
+            await authRegister(data.token, userData);
+          }
+          
+          toast.success('Registration successful!', {
+            description: 'Your account has been created successfully.',
+          });
+          
+          onClose();
+          setRegisterData({
+            name: '',
+            email: '',
+            password: '',
+            confirmPassword: '',
+            phone: ''
+          });
+        } else {
+          throw new Error('Invalid response structure');
+        }
+      } else {
+        throw new Error(data.message || data.error || 'Registration failed');
+      }
+
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      setError(error.message || 'Registration failed. Please try again.');
+      toast.error('Registration failed', {
+        description: error.message
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fill with existing user from your database
+  const fillDemoCredentials = () => {
+    setLoginData({
+      email: 'rsinghranjeet7428@gmail.com',
+      password: 'password123' // You'll need to know the actual password
+    });
+  };
+
+  // Fill with test credentials
+  const fillTestCredentials = () => {
+    setLoginData({
+      email: 'ranjeet@gmail.com',
+      password: 'password123' // You'll need to know the actual password
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl max-w-md w-full">
-        <div className="p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">
-              {isLogin ? 'Welcome Back' : 'Create Account'}
-            </h2>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-2xl text-center">
+            Welcome to Easy2Rent
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* Demo Users Banner */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-100 mb-4">
+          <div className="flex items-center gap-2 text-blue-700 mb-2">
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-sm font-semibold">Test Accounts</span>
           </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Full Name
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      required={!isLogin}
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="John Doe"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone (Optional)
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="9876543210"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="you@example.com"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          <p className="text-xs text-blue-600 mb-3">
+            Use these existing accounts from database:
+          </p>
+          <div className="space-y-2">
+            <Button 
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={fillDemoCredentials}
+              className="w-full text-xs border-blue-200 text-blue-700 hover:bg-blue-100 justify-start"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  {isLogin ? 'Logging in...' : 'Creating account...'}
-                </>
-              ) : (
-                <>{isLogin ? 'Login' : 'Create Account'}</>
-              )}
+              <User className="h-3 w-3 mr-2" />
+              rsinghranjeet7428@gmail.com
             </Button>
-          </form>
-
-          {/* Toggle between login/register */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <button
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
-              >
-                {isLogin ? 'Sign up' : 'Login'}
-              </button>
-            </p>
+            <Button 
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={fillTestCredentials}
+              className="w-full text-xs border-blue-200 text-blue-700 hover:bg-blue-100 justify-start"
+            >
+              <User className="h-3 w-3 mr-2" />
+              ranjeet@gmail.com
+            </Button>
           </div>
-
-          {/* Demo credentials */}
-          {isLogin && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">Demo Credentials:</p>
-              <p className="text-xs text-gray-600">Email: demo@example.com</p>
-              <p className="text-xs text-gray-600">Password: demo123</p>
-            </div>
-          )}
+          <p className="text-xs text-gray-500 mt-2">
+            Note: You need the correct password for these accounts
+          </p>
         </div>
-      </div>
-    </div>
+
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'register')}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="login">Login</TabsTrigger>
+            <TabsTrigger value="register">Register</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="login">
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="login-email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="login-email"
+                    name="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={loginData.email}
+                    onChange={handleLoginChange}
+                    className="pl-10"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="login-password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    value={loginData.password}
+                    onChange={handleLoginChange}
+                    className="pl-10 pr-10"
+                    required
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {error && activeTab === 'login' && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Logging in...
+                  </>
+                ) : (
+                  'Login'
+                )}
+              </Button>
+
+              <div className="text-center text-sm text-gray-500">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('register')}
+                  className="text-primary hover:underline"
+                >
+                  Don't have an account? Register
+                </button>
+              </div>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="register">
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="register-name">Full Name *</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="register-name"
+                    name="name"
+                    placeholder="Enter your full name"
+                    value={registerData.name}
+                    onChange={handleRegisterChange}
+                    className="pl-10"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                {registerErrors.name && (
+                  <p className="text-xs text-red-500">{registerErrors.name}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="register-email">Email *</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="register-email"
+                    name="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={registerData.email}
+                    onChange={handleRegisterChange}
+                    className="pl-10"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                {registerErrors.email && (
+                  <p className="text-xs text-red-500">{registerErrors.email}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="register-phone">Phone Number (Optional)</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="register-phone"
+                    name="phone"
+                    type="tel"
+                    placeholder="Enter your phone number"
+                    value={registerData.phone}
+                    onChange={handleRegisterChange}
+                    className="pl-10"
+                    disabled={isLoading}
+                  />
+                </div>
+                {registerErrors.phone && (
+                  <p className="text-xs text-red-500">{registerErrors.phone}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="register-password">Password *</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="register-password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Create a password (min. 6 characters)"
+                    value={registerData.password}
+                    onChange={handleRegisterChange}
+                    className="pl-10 pr-10"
+                    required
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {registerErrors.password && (
+                  <p className="text-xs text-red-500">{registerErrors.password}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="register-confirm-password">Confirm Password *</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="register-confirm-password"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Confirm your password"
+                    value={registerData.confirmPassword}
+                    onChange={handleRegisterChange}
+                    className="pl-10 pr-10"
+                    required
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {registerErrors.confirmPassword && (
+                  <p className="text-xs text-red-500">{registerErrors.confirmPassword}</p>
+                )}
+              </div>
+
+              {error && activeTab === 'register' && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Creating account...
+                  </>
+                ) : (
+                  'Register'
+                )}
+              </Button>
+
+              <div className="text-center text-sm text-gray-500">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('login')}
+                  className="text-primary hover:underline"
+                >
+                  Already have an account? Login
+                </button>
+              </div>
+            </form>
+          </TabsContent>
+        </Tabs>
+
+        <div className="text-xs text-center text-gray-400 mt-4">
+          By continuing, you agree to our Terms of Service and Privacy Policy
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
+
+export default LoginModal;

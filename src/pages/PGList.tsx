@@ -1,12 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PGCard } from '@/components/pg/PGCard';
-import { useDebounce } from '@/lib/hooks/useDebounce';
 import { toast } from 'sonner';
-import { Loader2, AlertCircle, Search, Grid, List, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import { transformPGData } from '@/lib/utils/pgTransformer';
+import { Loader2, AlertCircle, Search, Grid, List, RefreshCw, ChevronRight } from 'lucide-react';
 
 // Updated to use your Render backend
 const API_URL = 'https://eassy-to-rent-backend.onrender.com/api';
@@ -32,11 +30,31 @@ interface PGListing {
   distance?: string;
   published?: boolean;
   locality?: string;
-  location?: string;
+  location?: {
+    type: string;
+    coordinates: number[];
+  };
+}
+
+// Simple debounce hook implementation inline
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
 }
 
 const PGList = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [selectedLocation, setSelectedLocation] = useState(searchParams.get('location') || 'all');
@@ -55,25 +73,26 @@ const PGList = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   
-  const debouncedSearch = useDebounce(searchQuery, 300);
+  const debouncedSearch = useDebounce(searchQuery, 500);
 
-  // Fetch first page on mount
+  // Update URL params when filters change
   useEffect(() => {
-    fetchListings(1, true);
-  }, []);
+    const params = new URLSearchParams();
+    if (searchQuery) params.set('q', searchQuery);
+    if (selectedLocation !== 'all') params.set('location', selectedLocation);
+    if (selectedType !== 'all') params.set('type', selectedType);
+    setSearchParams(params);
+  }, [searchQuery, selectedLocation, selectedType, setSearchParams]);
 
   // Fetch when filters change (reset to page 1)
   useEffect(() => {
-    if (!loading) {
-      fetchListings(1, true);
-    }
+    fetchListings(1, true);
   }, [selectedLocation, selectedType, sortBy, debouncedSearch]);
 
+  // Initial fetch
   useEffect(() => {
-    if (searchParams.get('q')) setSearchQuery(searchParams.get('q') || '');
-    if (searchParams.get('location')) setSelectedLocation(searchParams.get('location') || 'all');
-    if (searchParams.get('type')) setSelectedType(searchParams.get('type') || 'all');
-  }, [searchParams]);
+    fetchListings(1, true);
+  }, []);
 
   const fetchListings = async (page = 1, reset = false) => {
     try {
@@ -89,9 +108,9 @@ const PGList = () => {
       // Build URL with pagination parameters
       const url = new URL(`${API_URL}/pg`);
       url.searchParams.append('page', page.toString());
-      url.searchParams.append('limit', '20'); // 20 items per page
+      url.searchParams.append('limit', '12'); // 12 items per page for better grid layout
       
-      // Add filters if needed (if your backend supports them)
+      // Add filters
       if (selectedType !== 'all') {
         url.searchParams.append('type', selectedType);
       }
@@ -102,26 +121,51 @@ const PGList = () => {
         url.searchParams.append('search', debouncedSearch);
       }
       
-      console.log('Fetching listings from:', url.toString());
+      // Add sorting
+      switch (sortBy) {
+        case 'price_asc':
+          url.searchParams.append('sort', 'price');
+          url.searchParams.append('order', 'asc');
+          break;
+        case 'price_desc':
+          url.searchParams.append('sort', 'price');
+          url.searchParams.append('order', 'desc');
+          break;
+        case 'rating':
+          url.searchParams.append('sort', 'rating');
+          url.searchParams.append('order', 'desc');
+          break;
+        case 'newest':
+          url.searchParams.append('sort', 'createdAt');
+          url.searchParams.append('order', 'desc');
+          break;
+      }
       
-      const response = await fetch(url.toString());
+      console.log('🔍 Fetching listings from:', url.toString());
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
       const result = await response.json();
-      console.log('API Response:', result);
+      console.log('📦 API Response:', result);
       
       if (!result.success) {
         throw new Error(result.message || 'API request failed');
       }
       
       // Extract data from response
-      const listingsData = result.data?.items || [];
-      const newTotalCount = result.data?.total || 0;
-      const newTotalPages = result.data?.pages || 1;
-      const currentPageData = result.data?.page || 1;
+      const listingsData = result.data?.items || result.data || [];
+      const newTotalCount = result.data?.total || listingsData.length;
+      const newTotalPages = result.data?.pages || Math.ceil(newTotalCount / 12) || 1;
+      const currentPageData = result.data?.page || page;
       
       setTotalCount(newTotalCount);
       setTotalPages(newTotalPages);
@@ -129,30 +173,30 @@ const PGList = () => {
       setHasMore(currentPageData < newTotalPages);
       
       if (!Array.isArray(listingsData)) {
-        console.warn('Listings data is not an array:', listingsData);
+        console.warn('⚠️ Listings data is not an array:', listingsData);
         if (reset) setListings([]);
         return;
       }
       
-      console.log(`Received ${listingsData.length} listings from database (Page ${currentPageData}/${newTotalPages}, Total: ${newTotalCount})`);
+      console.log(`✅ Received ${listingsData.length} listings from database (Page ${currentPageData}/${newTotalPages}, Total: ${newTotalCount})`);
       
-      // ✅ UPDATED: Use the transformer utility
-      const transformedListings = listingsData.map((listing: any) => transformPGData(listing));
+      // Filter out unpublished listings if needed (backend should handle this)
+      const publishedListings = listingsData.filter((listing: any) => 
+        listing.published !== false
+      );
       
       if (reset) {
-        setListings(transformedListings);
+        setListings(publishedListings);
       } else {
-        setListings(prev => [...prev, ...transformedListings]);
+        setListings(prev => [...prev, ...publishedListings]);
       }
       
-      if (reset && transformedListings.length === 0) {
+      if (reset && publishedListings.length === 0) {
         toast.info('No PG listings found. Add some listings to get started.');
-      } else if (reset) {
-        toast.success(`Loaded ${transformedListings.length} PG listings`);
       }
       
     } catch (err: any) {
-      console.error('Error fetching listings:', err);
+      console.error('❌ Error fetching listings:', err);
       setError(`Failed to load listings: ${err.message}`);
       toast.error('Failed to load PG listings');
     } finally {
@@ -167,11 +211,11 @@ const PGList = () => {
     }
   };
 
+  // Client-side sorting (in case backend doesn't support sorting)
   const filteredPGs = useMemo(() => {
-    // Since we're fetching filtered data from backend, this is now just for client-side sorting
     let filtered = [...listings];
 
-    // Sort the filtered results
+    // Apply client-side sorting
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'price_asc': 
@@ -190,6 +234,7 @@ const PGList = () => {
     return filtered;
   }, [listings, sortBy]);
 
+  // Extract unique locations for filter dropdown
   const locations = useMemo(() => {
     const uniqueLocations = new Set<string>();
     listings.forEach(pg => {
@@ -203,6 +248,7 @@ const PGList = () => {
     setSearchQuery('');
     setSelectedLocation('all');
     setSelectedType('all');
+    setSortBy('newest');
     toast.success('Filters cleared');
   };
 
@@ -237,15 +283,22 @@ const PGList = () => {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Find PG Accommodations</h1>
               <p className="text-gray-600">
-                {totalCount} accommodations available
-                {listings.length > 0 && ` (showing ${listings.length} of ${totalCount})`}
+                {totalCount > 0 ? (
+                  <>
+                    {totalCount} accommodations available
+                    {listings.length > 0 && ` (showing ${listings.length} of ${totalCount})`}
+                  </>
+                ) : (
+                  'No accommodations found'
+                )}
               </p>
             </div>
             <button
               onClick={refreshListings}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition-colors"
+              disabled={loading}
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh Listings
             </button>
           </div>
@@ -324,19 +377,25 @@ const PGList = () => {
               onClick={() => setSelectedType('boys')}
               className={`px-4 py-2 rounded-lg text-sm transition-colors ${selectedType === 'boys' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
             >
-              Boys PG
+              👨 Boys PG
             </button>
             <button
               onClick={() => setSelectedType('girls')}
               className={`px-4 py-2 rounded-lg text-sm transition-colors ${selectedType === 'girls' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
             >
-              Girls PG
+              👩 Girls PG
             </button>
             <button
               onClick={() => setSelectedType('co-ed')}
               className={`px-4 py-2 rounded-lg text-sm transition-colors ${selectedType === 'co-ed' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
             >
-              Co-ed PG
+              👥 Co-ed PG
+            </button>
+            <button
+              onClick={() => setSelectedType('family')}
+              className={`px-4 py-2 rounded-lg text-sm transition-colors ${selectedType === 'family' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              👪 Family PG
             </button>
             
             <select
@@ -345,7 +404,7 @@ const PGList = () => {
               className="border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white min-w-[150px]"
               aria-label="Select location"
             >
-              <option value="all">All Locations</option>
+              <option value="all">📍 All Locations</option>
               {locations.filter(loc => loc !== 'all').map((location) => (
                 <option key={location} value={location}>{location}</option>
               ))}

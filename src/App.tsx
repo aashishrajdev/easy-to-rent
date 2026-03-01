@@ -10,7 +10,7 @@ import { WishlistProvider } from "./contexts/WishlistContext";
 import { CompareProvider } from "./contexts/CompareContext";
 
 import Index from "./pages/Index";
-import PGList from "./pages/PGList"; 
+import PGList from "./pages/PGList";
 import PGDetail from "./pages/PGDetail";
 import Wishlist from "./pages/Wishlist";
 import Compare from "./pages/Compare";
@@ -19,12 +19,7 @@ import Contact from "./pages/Contact";
 import FAQ from "./pages/FAQ";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
-
-import AdminLoginPage from "./pages/AdminLoginPage";
-import AdminPGPortal from "./pages/AdminPGPortal";
 import NotFound from "./pages/NotFound";
-
-import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -50,23 +45,6 @@ const App = () => (
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
-
-                {/* ================= Admin Routes ================= */}
-                {/* Admin Login */}
-                <Route path="/login" element={<AdminLoginPage />} />
-
-                {/* Optional: old URL support */}
-                <Route path="/admin/login" element={<AdminLoginPage />} />
-
-                {/* Admin Dashboard (Protected) */}
-                <Route
-                  path="/admin"
-                  element={
-                    <ProtectedRoute>
-                      <AdminPGPortal />
-                    </ProtectedRoute>
-                  }
-                />
 
                 {/* ================= 404 ================= */}
                 <Route path="*" element={<NotFound />} />

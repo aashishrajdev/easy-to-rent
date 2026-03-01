@@ -6,9 +6,38 @@ import { PGCard } from '@/components/pg/PGCard';
 
 const API_URL = 'https://eassy-to-rent-backend.onrender.com';
 
+// Define the PG interface to match your backend structure
+interface PGListing {
+  _id: string;
+  id?: string;
+  name: string;
+  slug?: string;
+  description: string;
+  city: string;
+  locality: string;
+  address: string;
+  price: number;
+  type: 'boys' | 'girls' | 'co-ed' | 'family';
+  images: string[];
+  gallery?: string[];
+  amenities: string[];
+  verified: boolean;
+  featured: boolean;
+  rating: number;
+  reviewCount: number;
+  ownerName?: string;
+  ownerPhone?: string;
+  wifi?: boolean;
+  meals?: boolean;
+  ac?: boolean;
+  parking?: boolean;
+  createdAt: string;
+  distance?: string;
+}
+
 export function FeaturedPGs() {
-  const [allPGs, setAllPGs] = useState([]);
-  const [displayedPGs, setDisplayedPGs] = useState([]);
+  const [allPGs, setAllPGs] = useState<PGListing[]>([]);
+  const [displayedPGs, setDisplayedPGs] = useState<PGListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const itemsPerPage = 6;
@@ -22,9 +51,9 @@ export function FeaturedPGs() {
       setLoading(true);
       setError('');
       
-      console.log('🌐 Fetching PGs from:', `${API_URL}/api/pg`);
+      console.log('🌐 Fetching PGs from:', `${API_URL}/api/pg?limit=20`);
       
-      const response = await fetch(`${API_URL}/api/pg`, {
+      const response = await fetch(`${API_URL}/api/pg?limit=20`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -40,30 +69,47 @@ export function FeaturedPGs() {
       const result = await response.json();
       console.log('📥 Response received:', result);
       
-      // ✅ FIXED: Extract PGs from result.data.items (your backend structure)
-      let pgs = [];
+      // Handle different response structures
+      let pgs: PGListing[] = [];
       
-      if (result.success && result.data && Array.isArray(result.data.items)) {
-        // Your backend returns: { success: true, data: { items: [...], count, total, page, pages } }
-        pgs = result.data.items;
-        console.log(`✅ Found ${pgs.length} PGs from backend`);
-        console.log(`📊 Total PGs: ${result.data.total}, Page: ${result.data.page}/${result.data.pages}`);
+      if (result.success) {
+        // Case 1: { success: true, data: { items: [...] } }
+        if (result.data?.items && Array.isArray(result.data.items)) {
+          pgs = result.data.items;
+          console.log(`✅ Found ${pgs.length} PGs from backend (paginated)`);
+          console.log(`📊 Total: ${result.data.total}, Page: ${result.data.page}/${result.data.pages}`);
+        }
+        // Case 2: { success: true, data: [...] }
+        else if (Array.isArray(result.data)) {
+          pgs = result.data;
+          console.log(`✅ Found ${pgs.length} PGs from backend (direct array)`);
+        }
+        // Case 3: { success: true, items: [...] }
+        else if (Array.isArray(result.items)) {
+          pgs = result.items;
+          console.log(`✅ Found ${pgs.length} PGs from backend (items array)`);
+        }
+        else {
+          console.warn('Unexpected data structure:', result);
+        }
       } else {
-        console.warn('Unexpected response format:', result);
-        throw new Error('Invalid data format from server');
+        throw new Error(result.message || 'Failed to fetch PGs');
       }
       
-      if (pgs.length === 0) {
-        setError('No PGs found in database');
+      // Filter to only show published PGs
+      const publishedPGs = pgs.filter(pg => pg.published !== false);
+      
+      if (publishedPGs.length === 0) {
+        setError('No published PGs found in database');
         setAllPGs([]);
         setDisplayedPGs([]);
         return;
       }
       
-      setAllPGs(pgs);
-      updateDisplayedPGs(pgs);
+      setAllPGs(publishedPGs);
+      updateDisplayedPGs(publishedPGs);
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Fetch error:', err);
       setError(`Failed to load data: ${err.message}`);
     } finally {
@@ -71,14 +117,19 @@ export function FeaturedPGs() {
     }
   };
 
-  const updateDisplayedPGs = (pgs) => {
-    // Sort by featured first, then by createdAt or any other criteria
+  const updateDisplayedPGs = (pgs: PGListing[]) => {
+    // Sort by featured first, then by rating, then by createdAt
     const sortedPGs = [...pgs].sort((a, b) => {
       // First sort by featured (true first)
       if (a.featured && !b.featured) return -1;
       if (!a.featured && b.featured) return 1;
+      
+      // Then by rating (higher first)
+      if ((a.rating || 0) > (b.rating || 0)) return -1;
+      if ((a.rating || 0) < (b.rating || 0)) return 1;
+      
       // Then by createdAt (newest first)
-      return new Date(b.createdAt) - new Date(a.createdAt);
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
     
     const initialCount = Math.min(itemsPerPage, sortedPGs.length);
@@ -86,8 +137,36 @@ export function FeaturedPGs() {
   };
 
   // Helper function to count PGs by type
-  const countByType = (type) => {
+  const countByType = (type: string): number => {
     return allPGs.filter(pg => pg.type === type).length;
+  };
+
+  // Helper function to transform PG data for PGCard
+  const transformForPGCard = (pg: PGListing) => {
+    return {
+      id: pg._id || pg.id || '',
+      name: pg.name,
+      slug: pg.slug || pg._id,
+      description: pg.description,
+      price: pg.price,
+      images: pg.images || [],
+      gallery: pg.gallery || [],
+      city: pg.city,
+      locality: pg.locality,
+      type: pg.type,
+      amenities: pg.amenities || [],
+      rating: pg.rating || 0,
+      reviewCount: pg.reviewCount || 0,
+      ownerName: pg.ownerName,
+      ownerPhone: pg.ownerPhone,
+      featured: pg.featured || false,
+      verified: pg.verified || false,
+      wifi: pg.wifi || pg.amenities?.some(a => a.toLowerCase().includes('wifi')) || false,
+      meals: pg.meals || pg.amenities?.some(a => a.toLowerCase().includes('meal')) || false,
+      ac: pg.ac || pg.amenities?.some(a => a.toLowerCase().includes('ac') || a.toLowerCase().includes('air')) || false,
+      parking: pg.parking || pg.amenities?.some(a => a.toLowerCase().includes('park')) || false,
+      distance: pg.distance,
+    };
   };
 
   if (loading) {
@@ -204,7 +283,7 @@ export function FeaturedPGs() {
                       </div>
                     </div>
                   )}
-                  <PGCard pg={pg} index={index} />
+                  <PGCard pg={transformForPGCard(pg)} index={index} />
                 </div>
               ))}
             </div>
