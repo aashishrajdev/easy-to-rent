@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Heart, GitCompare, Search, Home, MapPin, Shield, Star, X, Menu } from "lucide-react";
+import { Heart, GitCompare, Search, Home, MapPin, Shield, Star, X, Menu, LogIn, LogOut, UserCircle, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useCompare } from "@/contexts/CompareContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const { wishlist } = useWishlist();
   const { compareList } = useCompare();
+  const { isAuthenticated, user, logout } = useAuth();
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const navLinks = [
     { href: "/", label: "Home", icon: <Home className="h-4 w-4" /> },
@@ -124,6 +127,78 @@ export function Navbar() {
                 Search PG
               </Button>
             </Link>
+
+            {/* Auth Button */}
+            {isAuthenticated ? (
+              <div className="relative">
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-full bg-orange-50 hover:bg-orange-100 border border-orange-200 transition-colors"
+                >
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white text-sm font-bold">
+                    {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                  </div>
+                  <span className="text-sm font-medium text-gray-700 hidden xl:inline max-w-[80px] truncate">
+                    {user?.name?.split(' ')[0]}
+                  </span>
+                </button>
+                {showProfileMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <p className="font-semibold text-gray-900 truncate">{user?.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                        {user?.role && user.role !== 'user' && (
+                          <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
+                            user.role === 'admin' ? 'bg-red-100 text-red-600' : 'bg-purple-100 text-purple-600'
+                          }`}>
+                            {user.role}
+                          </span>
+                        )}
+                      </div>
+                      {user?.role === 'owner' && (
+                        <Link
+                          to="/owner"
+                          onClick={() => setShowProfileMenu(false)}
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+                        >
+                          <Building2 className="h-4 w-4" />
+                          My Dashboard
+                        </Link>
+                      )}
+                      {user?.role === 'admin' && (
+                        <Link
+                          to="/admin"
+                          onClick={() => setShowProfileMenu(false)}
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+                        >
+                          <Shield className="h-4 w-4" />
+                          Admin Panel
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => { logout(); setShowProfileMenu(false); }}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <Link to="/login">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2 border-orange-300 text-orange-600 hover:bg-orange-50 font-medium"
+                >
+                  <LogIn className="h-4 w-4" />
+                  <span className="hidden xl:inline">Login</span>
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -229,6 +304,27 @@ export function Navbar() {
                   Start Exploring PGs
                 </Button>
               </Link>
+
+              {/* Mobile Auth Button */}
+              {isAuthenticated ? (
+                <button
+                  onClick={() => { logout(); setIsOpen(false); }}
+                  className="w-full flex items-center justify-center gap-2 h-12 text-base font-semibold rounded-md border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                >
+                  <LogOut className="h-5 w-5" />
+                  Sign Out ({user?.name?.split(' ')[0]})
+                </button>
+              ) : (
+                <Link to="/login" onClick={() => setIsOpen(false)}>
+                  <Button
+                    variant="outline"
+                    className="w-full flex items-center justify-center gap-2 h-12 text-base font-semibold border-orange-300 text-orange-600 hover:bg-orange-50"
+                  >
+                    <LogIn className="h-5 w-5" />
+                    Login / Sign Up
+                  </Button>
+                </Link>
+              )}
            </div>
         </div>
       </div>
