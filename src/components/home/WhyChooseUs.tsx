@@ -1,6 +1,7 @@
 // /src/components/home/WhyChooseUs.tsx
 import React from 'react';
 import { CheckCircle, Shield, Users, Clock, MapPin, Award } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface FeatureCardProps {
   icon: React.ReactNode;
@@ -129,7 +130,7 @@ export default function WhyChooseUs() {
         </div>
 
         {/* Process Section */}
-        <div className="bg-gradient-to-r from-primary/5 to-secondary/10 rounded-2xl p-8 md:p-12">
+        <div className="bg-gradient-to-r from-primary/5 to-secondary/10 rounded-2xl p-8 md:p-12 mb-16">
           <h3 className="text-2xl font-bold text-center mb-8">How It Works</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="text-center">
@@ -164,8 +165,36 @@ export default function WhyChooseUs() {
           </div>
         </div>
 
-       
-        
+        {/* Map Section */}
+        <div className="mt-16">
+          <div className="text-center mb-8">
+            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
+              Our Coverage
+            </Badge>
+            <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
+              PG Locations Across Campus
+            </h3>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Find accommodation in all popular student areas near Chandigarh University
+            </p>
+          </div>
+
+          <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-primary/20">
+            <iframe
+              title="Chandigarh University Map"
+              src="https://www.google.com/maps?q=Chandigarh+University+Punjab&output=embed"
+              className="w-full h-[500px]"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+
+            {/* Campus Label */}
+            <div className="absolute top-6 left-6 bg-background/90 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-border">
+              <div className="font-semibold text-foreground">Chandigarh University</div>
+              <div className="text-sm text-muted-foreground">Gharuan, Punjab</div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
