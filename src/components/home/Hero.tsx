@@ -61,11 +61,7 @@ export function Hero() {
             From Home
           </h1>
 
-          <p className="text-lg md:text-xl text-primary-foreground/80 mb-8 max-w-2xl mx-auto animate-fade-up" style={{ animationDelay: '200ms' }}>
-           Discover verified PG accommodations near Chandigarh University campus. Safe, affordable, and just a walk away from your classes.
-Enjoy hassle-free booking with zero brokerage and genuine listings.
-Perfect for students seeking comfort, security, and convenience near Chandigarh University.
-          </p>
+        
 
           {/* Search Box */}
           <div className="bg-card rounded-2xl p-4 md:p-6 card-shadow animate-fade-up" style={{ animationDelay: '300ms' }}>

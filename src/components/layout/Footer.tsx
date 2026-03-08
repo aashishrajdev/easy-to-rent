@@ -64,7 +64,7 @@ export function Footer() {
   const fileInputRef = useRef(null);
   const settingsRef = useRef(null);
 
-  // Knowledge base for responses
+  // Knowledge base for responses (keeping your existing knowledgeBase object)
   const knowledgeBase = {
     properties: {
       available: "We currently have 156 verified properties available across 8 locations:\n\n• University Area: 42 properties\n• City Center: 38 properties\n• Library Road: 25 properties\n• Sports Complex: 18 properties\n• Girls PG Zone: 15 properties\n• Boys PG Zone: 12 properties\n\nPlease specify your preferences for a refined list.",
@@ -920,60 +920,126 @@ export function Footer() {
               </p>
               <div className="flex gap-2">
                 {[Facebook, Twitter, Instagram, Youtube].map((Icon, i) => (
-                  <a key={i} href="#" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-orange-500">
+                  <a 
+                    key={i} 
+                    href="#" 
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-orange-500 footer-social"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      // Add your social media links here
+                      const socialLinks = [
+                        "https://facebook.com/easytorent",
+                        "https://twitter.com/easytorent",
+                        "https://instagram.com/easytorent",
+                        "https://youtube.com/easytorent"
+                      ];
+                      window.open(socialLinks[i], '_blank');
+                    }}
+                  >
                     <Icon className="h-4 w-4" />
                   </a>
                 ))}
               </div>
             </div>
 
-            {/* Quick Links */}
+            {/* Quick Links - FIXED WITH CORRECT ROUTES */}
             <div>
               <h4 className="footer-title text-lg font-semibold text-orange-400">Quick Links</h4>
               <ul className="mt-4 space-y-2 text-sm text-gray-400">
-                {["Find Properties", "List Property", "How It Works", "Contact Us", "FAQs"].map((item) => (
-                  <li key={item}>
-                    <Link to={`/${item.toLowerCase().replace(/\s+/g, '-')}`} className="footer-link hover:text-orange-400">
-                      {item}
-                    </Link>
-                  </li>
-                ))}
+                <li>
+                  <Link to="/pg-list" className="footer-link hover:text-orange-400">
+                    Find Properties
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/register-property" className="footer-link hover:text-orange-400">
+                    List Property
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/how-it-works-page" className="footer-link hover:text-orange-400">
+                    How It Works
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/contact" className="footer-link hover:text-orange-400">
+                    Contact Us
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/faq" className="footer-link hover:text-orange-400">
+                    FAQs
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/about" className="footer-link hover:text-orange-400">
+                    About Us
+                  </Link>
+                </li>
               </ul>
             </div>
 
-            {/* Locations */}
+            {/* Locations - FIXED WITH FILTER ROUTES */}
             <div>
-              <h4 className="footer-title text-lg font-semibold text-orange-400">Locations</h4>
+              <h4 className="footer-title text-lg font-semibold text-orange-400">Popular Locations</h4>
               <ul className="mt-4 space-y-2 text-sm text-gray-400">
-                {["University Area", "City Center", "Library Road", "Sports Complex", "Girls PG Zone", "Boys PG Zone"].map((area) => (
-                  <li key={area} className="flex items-center gap-2">
-                    <ChevronRight className="h-3 w-3 text-orange-400" />
-                    <Link to={`/location/${area.toLowerCase().replace(/\s+/g, '-')}`} className="footer-link hover:text-orange-400">
-                      {area}
-                    </Link>
-                  </li>
-                ))}
+                <li className="flex items-center gap-2">
+                  <ChevronRight className="h-3 w-3 text-orange-400" />
+                  <Link to="/pg-list?location=university-area" className="footer-link hover:text-orange-400">
+                    University Area
+                  </Link>
+                </li>
+                <li className="flex items-center gap-2">
+                  <ChevronRight className="h-3 w-3 text-orange-400" />
+                  <Link to="/pg-list?location=city-center" className="footer-link hover:text-orange-400">
+                    City Center
+                  </Link>
+                </li>
+                <li className="flex items-center gap-2">
+                  <ChevronRight className="h-3 w-3 text-orange-400" />
+                  <Link to="/pg-list?location=library-road" className="footer-link hover:text-orange-400">
+                    Library Road
+                  </Link>
+                </li>
+                <li className="flex items-center gap-2">
+                  <ChevronRight className="h-3 w-3 text-orange-400" />
+                  <Link to="/pg-list?location=sports-complex" className="footer-link hover:text-orange-400">
+                    Sports Complex
+                  </Link>
+                </li>
+                <li className="flex items-center gap-2">
+                  <ChevronRight className="h-3 w-3 text-orange-400" />
+                  <Link to="/pg-list?type=girls-pg" className="footer-link hover:text-orange-400">
+                    Girls PG Zone
+                  </Link>
+                </li>
+                <li className="flex items-center gap-2">
+                  <ChevronRight className="h-3 w-3 text-orange-400" />
+                  <Link to="/pg-list?type=boys-pg" className="footer-link hover:text-orange-400">
+                    Boys PG Zone
+                  </Link>
+                </li>
               </ul>
             </div>
 
-            {/* Contact */}
+            {/* Contact - KEPT SAME BUT ADDED ROUTES */}
             <div>
               <h4 className="footer-title text-lg font-semibold text-orange-400">Contact</h4>
               <ul className="mt-4 space-y-2 text-sm text-gray-400">
                 <li className="flex gap-2">
-                  <MapPin className="h-4 w-4 text-orange-400" />
+                  <MapPin className="h-4 w-4 text-orange-400 flex-shrink-0 mt-1" />
                   <span>Chandigarh University Area, Punjab</span>
                 </li>
                 <li className="flex gap-2">
-                  <Phone className="h-4 w-4 text-orange-400" />
+                  <Phone className="h-4 w-4 text-orange-400 flex-shrink-0" />
                   <a href="tel:+919315058665" className="hover:text-orange-400">+91 93150 58665</a>
                 </li>
                 <li className="flex gap-2">
-                  <Mail className="h-4 w-4 text-orange-400" />
-                  <a href="mailto:supporteasytorent@gmail.com" className="hover:text-orange-400">supporteasytorent@gmail.com</a>
+                  <Mail className="h-4 w-4 text-orange-400 flex-shrink-0" />
+                  <a href="mailto:supporteasytorent@gmail.com" className="hover:text-orange-400 break-all">supporteasytorent@gmail.com</a>
                 </li>
                 <li className="flex gap-2">
-                  <Clock className="h-4 w-4 text-orange-400" />
+                  <Clock className="h-4 w-4 text-orange-400 flex-shrink-0" />
                   <span>Mon-Sat: 9 AM - 8 PM</span>
                 </li>
               </ul>
@@ -990,7 +1056,7 @@ export function Footer() {
                     className="newsletter-input w-full rounded-lg border border-white/10 px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none"
                     required
                   />
-                  <button type="submit" className="w-full rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium hover:bg-orange-600">
+                  <button type="submit" className="w-full rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium hover:bg-orange-600 transition-colors">
                     Subscribe
                   </button>
                 </form>
@@ -998,13 +1064,13 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Bottom Bar */}
+          {/* Bottom Bar - FIXED WITH CORRECT ROUTES */}
           <div className="footer-bottom mt-10 flex flex-col items-center justify-between gap-4 border-t border-white/10 py-4 text-sm text-gray-400 md:flex-row">
             <p>&copy; {new Date().getFullYear()} EasyToRent. All rights reserved.</p>
-            <div className="flex gap-4">
-              <Link to="/privacy" className="hover:text-orange-400">Privacy</Link>
-              <Link to="/terms" className="hover:text-orange-400">Terms</Link>
-              <Link to="/refund" className="hover:text-orange-400">Refund</Link>
+            <div className="flex gap-6">
+              <Link to="/privacy" className="hover:text-orange-400 transition-colors">Privacy</Link>
+              <Link to="/terms" className="hover:text-orange-400 transition-colors">Terms</Link>
+              <Link to="/refund" className="hover:text-orange-400 transition-colors">Refund</Link>
             </div>
             <div className="flex items-center gap-2">
               <span className="status-indicator"></span>
