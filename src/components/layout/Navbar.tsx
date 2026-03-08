@@ -111,7 +111,7 @@ export function Navbar() {
                 {wishlist.length > 0 && <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-xs">{wishlist.length}</span>}
               </Button>
             </Link>
-            <Link to="/compare">
+            {/* <Link to="/compare">
               <Button
                 variant="outline"
                 className="flex items-center gap-2 border-gray-300 text-gray-700 hover:border-orange-400 hover:text-orange-600 font-medium"
@@ -120,7 +120,7 @@ export function Navbar() {
                 <span className="hidden xl:inline">Compare</span>
                 {compareList.length > 0 && <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-xs">{compareList.length}</span>}
               </Button>
-            </Link>
+            </Link> */}
             <Link to="/pg">
               <Button className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md hover:shadow-lg transition-all">
                 <Search className="h-4 w-4" />

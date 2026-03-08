@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Star, AlertCircle, Wifi } from 'lucide-react';
+import { ArrowRight, Star, AlertCircle, Wifi, GitCompare } from 'lucide-react';
+import { useCompare } from "@/contexts/CompareContext";
 import { Button } from '@/components/ui/button';
 import { PGCard } from '@/components/pg/PGCard';
 
@@ -8,6 +10,7 @@ const API_URL = 'https://eassy-to-rent-backend.onrender.com';
 
 // Define the PG interface to match your backend structure
 interface PGListing {
+  published: boolean;
   _id: string;
   id?: string;
   name: string;
@@ -41,6 +44,8 @@ export function FeaturedPGs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const itemsPerPage = 6;
+  const { compareList } = useCompare();
+  
 
   useEffect(() => {
     fetchPGs();
@@ -251,6 +256,16 @@ export function FeaturedPGs() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
+                        <Link to="/compare">
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 border-gray-300 text-gray-700 hover:border-orange-400 hover:text-orange-600 font-medium"
+              >
+                <GitCompare className="h-4 w-4" />
+                <span className="hidden xl:inline">Compare</span>
+                {compareList.length > 0 && <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-xs">{compareList.length}</span>}
+              </Button>
+            </Link>
             <Link to="/pg">
               <Button className="bg-orange-600 hover:bg-orange-700 gap-2">
                 View All PGs
