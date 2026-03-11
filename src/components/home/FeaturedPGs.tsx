@@ -699,7 +699,7 @@ import { ArrowRight, Star, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PGCard } from '@/components/pg/PGCard';
 
-// FIXED: Correct backend URL
+// Your correct backend URL
 const API_URL = 'https://eassy-to-rent-backend.onrender.com';
 
 interface PGListing {
@@ -862,10 +862,10 @@ export function FeaturedPGs() {
               <AlertCircle className="h-8 w-8 text-orange-600" />
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {error ? 'Connection Error' : 'No PGs Available'}
+              Connection Error
             </h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              {error || 'There are no accommodations available at the moment. Check back soon!'}
+              {error || 'Unable to connect to the server. Please try again.'}
             </p>
             <Button 
               onClick={fetchPGs}
