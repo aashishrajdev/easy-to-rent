@@ -736,6 +736,7 @@ export function FeaturedPGs() {
   const [displayedPGs, setDisplayedPGs] = useState<PGListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [debugInfo, setDebugInfo] = useState('');
   const itemsPerPage = 6;
 
   useEffect(() => {
@@ -746,8 +747,21 @@ export function FeaturedPGs() {
     try {
       setLoading(true);
       setError('');
+      setDebugInfo('');
       
       console.log('🌐 Fetching from:', `${API_URL}/api/pg`);
+      
+      // First test if backend is reachable
+      try {
+        const testResponse = await fetch(`${API_URL}/health`, {
+          method: 'GET',
+          mode: 'cors',
+        });
+        console.log('Health check status:', testResponse.status);
+      } catch (healthErr) {
+        console.error('Health check failed:', healthErr);
+        setDebugInfo('Backend health check failed - server might be down');
+      }
       
       const response = await fetch(`${API_URL}/api/pg`, {
         method: 'GET',
@@ -756,8 +770,9 @@ export function FeaturedPGs() {
           'Accept': 'application/json'
         },
         mode: 'cors',
-        cache: 'no-cache'
       });
+      
+      console.log('Response status:', response.status);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -772,6 +787,9 @@ export function FeaturedPGs() {
       if (result.success && result.data?.items && Array.isArray(result.data.items)) {
         pgs = result.data.items;
         console.log(`✅ Found ${pgs.length} PGs from database`);
+      } else if (result.success && Array.isArray(result.data)) {
+        pgs = result.data;
+        console.log(`✅ Found ${pgs.length} PGs from database`);
       } else {
         console.warn('Unexpected data structure:', result);
       }
@@ -782,35 +800,26 @@ export function FeaturedPGs() {
     } catch (err: any) {
       console.error('❌ Fetch error:', err);
       setError(`Failed to load data: ${err.message}`);
+      setDebugInfo(`Check if backend is running: ${API_URL}`);
     } finally {
       setLoading(false);
     }
   };
 
   const updateDisplayedPGs = (pgs: PGListing[]) => {
-    // Sort by featured first, then by rating
     const sortedPGs = [...pgs].sort((a, b) => {
       if (a.featured && !b.featured) return -1;
       if (!a.featured && b.featured) return 1;
-      
-      // Then by rating (higher first)
-      if ((a.rating || 0) > (b.rating || 0)) return -1;
-      if ((a.rating || 0) < (b.rating || 0)) return 1;
-      
-      // Then by createdAt (newest first)
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return 0;
     });
     
-    const initialCount = Math.min(itemsPerPage, sortedPGs.length);
-    setDisplayedPGs(sortedPGs.slice(0, initialCount));
+    setDisplayedPGs(sortedPGs.slice(0, itemsPerPage));
   };
 
-  // Helper function to count PGs by type
   const countByType = (type: string): number => {
     return allPGs.filter(pg => pg.type === type).length;
   };
 
-  // Helper function to transform PG data for PGCard
   const transformForPGCard = (pg: PGListing) => {
     return {
       id: pg._id || pg.id || '',
@@ -867,7 +876,7 @@ export function FeaturedPGs() {
     );
   }
 
-  if (error || displayedPGs.length === 0) {
+  if (error) {
     return (
       <section className="py-16 md:py-24 bg-gradient-to-b from-white to-orange-50/30">
         <div className="container mx-auto px-4">
@@ -875,12 +884,28 @@ export function FeaturedPGs() {
             <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-orange-100 flex items-center justify-center">
               <AlertCircle className="h-8 w-8 text-orange-600" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {error ? 'Error Loading Data' : 'No PGs Available'}
-            </h3>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              {error || 'There are no accommodations available at the moment. Check back soon!'}
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Connection Error</h3>
+            <p className="text-muted-foreground mb-2 max-w-md mx-auto">
+              {error}
             </p>
+            {debugInfo && (
+              <p className="text-sm text-gray-500 mb-4">
+                Debug: {debugInfo}
+              </p>
+            )}
+            <div className="space-y-2 mb-6">
+              <p className="text-sm text-gray-600">
+                Try accessing this URL directly:
+              </p>
+              <a 
+                href={`${API_URL}/api/pg`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 underline break-all"
+              >
+                {API_URL}/api/pg
+              </a>
+            </div>
             <Button 
               onClick={fetchPGs}
               className="bg-orange-600 hover:bg-orange-700"
@@ -924,54 +949,68 @@ export function FeaturedPGs() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {displayedPGs.map((pg, index) => (
-            <div key={pg._id || pg.id || index} className="relative">
-              {pg.featured && (
-                <div className="absolute top-3 left-3 z-10">
-                  <div className="inline-flex items-center gap-1 px-3 py-1 bg-orange-500 text-white text-xs font-semibold rounded-full shadow-sm">
-                    <Star className="h-3 w-3 fill-white" />
-                    Featured
-                  </div>
-                </div>
-              )}
-              <PGCard 
-                pg={transformForPGCard(pg)} 
-                index={index}
-              />
+        {displayedPGs.length === 0 ? (
+          <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-2xl bg-white">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
+              <span className="text-2xl">🏠</span>
             </div>
-          ))}
-        </div>
-
-        <div className="mt-12 pt-8 border-t border-gray-200">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-center sm:text-left">
-              <h4 className="font-semibold text-gray-900 mb-1">
-                Need more options?
-              </h4>
-              <p className="text-sm text-gray-600">
-                Browse our complete collection of verified PG accommodations
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 justify-center">
-              <Link to="/pg?type=boys">
-                <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50">
-                   Boys PG ({countByType('boys')})
-                </Button>
-              </Link>
-              <Link to="/pg?type=girls">
-                <Button variant="outline" className="border-pink-300 text-pink-700 hover:bg-pink-50">
-                   Girls PG ({countByType('girls')})
-                </Button>
-              </Link>
-              <Link to="/pg?type=co-ed">
-                <Button variant="outline" className="border-purple-300 text-purple-700 hover:bg-purple-50">
-                   Co-ed PG ({countByType('co-ed')})
-                </Button>
-              </Link>
-            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No PGs Available</h3>
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              There are no accommodations available at the moment. Check back soon!
+            </p>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {displayedPGs.map((pg, index) => (
+                <div key={pg._id || pg.id || index} className="relative">
+                  {pg.featured && (
+                    <div className="absolute top-3 left-3 z-10">
+                      <div className="inline-flex items-center gap-1 px-3 py-1 bg-orange-500 text-white text-xs font-semibold rounded-full shadow-sm">
+                        <Star className="h-3 w-3 fill-white" />
+                        Featured
+                      </div>
+                    </div>
+                  )}
+                  <PGCard 
+                    pg={transformForPGCard(pg)} 
+                    index={index}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-12 pt-8 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-center sm:text-left">
+                  <h4 className="font-semibold text-gray-900 mb-1">
+                    Need more options?
+                  </h4>
+                  <p className="text-sm text-gray-600">
+                    Browse our complete collection of verified PG accommodations
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <Link to="/pg?type=boys">
+                    <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50">
+                       Boys PG ({countByType('boys')})
+                    </Button>
+                  </Link>
+                  <Link to="/pg?type=girls">
+                    <Button variant="outline" className="border-pink-300 text-pink-700 hover:bg-pink-50">
+                       Girls PG ({countByType('girls')})
+                    </Button>
+                  </Link>
+                  <Link to="/pg?type=co-ed">
+                    <Button variant="outline" className="border-purple-300 text-purple-700 hover:bg-purple-50">
+                       Co-ed PG ({countByType('co-ed')})
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </section>
   );
