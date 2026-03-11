@@ -352,6 +352,9 @@ import { PGCard } from '@/components/pg/PGCard';
 // Production backend URL
 const API_URL = 'https://eassy-to-rent-backend.onrender.com';
 
+// Default placeholder image when no real images exist
+const DEFAULT_PLACEHOLDER = '/api/placeholder/400/300';
+
 interface PGListing {
   _id: string;
   id?: string;
@@ -398,9 +401,7 @@ export function FeaturedPGs() {
       setError('');
       
       console.log('🌐 Fetching from:', `${API_URL}/api/pg?limit=20`);
-      console.log('📍 Current domain:', window.location.origin);
       
-      // Add cache busting
       const url = `${API_URL}/api/pg?limit=20&_=${Date.now()}`;
       
       const response = await fetch(url, {
@@ -432,87 +433,63 @@ export function FeaturedPGs() {
         }
       }
       
-      // Show all PGs, not just published ones for testing
-      if (pgs.length === 0) {
-        // If no PGs from API, show mock data for testing
-        console.log('No PGs from API, using mock data');
-        pgs = getMockPGs();
-      }
+      // Filter out any PGs with duplicate or invalid images
+      const cleanedPGs = pgs.map(cleanPGImages);
       
-      setAllPGs(pgs);
-      updateDisplayedPGs(pgs);
+      setAllPGs(cleanedPGs);
+      updateDisplayedPGs(cleanedPGs);
       
     } catch (err: any) {
       console.error('❌ Fetch error:', err);
       setError(`Failed to load data: ${err.message}`);
       
-      // Show mock data on error so UI doesn't break
-      const mockPGs = getMockPGs();
-      setAllPGs(mockPGs);
-      updateDisplayedPGs(mockPGs);
+      // Don't show mock data with duplicate images, show empty state instead
+      setAllPGs([]);
+      setDisplayedPGs([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Mock data function for testing
-  const getMockPGs = (): PGListing[] => {
-    return [
-      {
-        _id: '1',
-        name: 'Sunrise PG',
-        description: 'Nice PG with all amenities',
-        city: 'Chandigarh',
-        locality: 'Sector 44',
-        address: '444 bj nkkm',
-        price: 5000,
-        type: 'boys',
-        images: [],
-        amenities: ['WiFi', 'AC', 'Power Backup'],
-        verified: true,
-        featured: true,
-        rating: 4.0,
-        reviewCount: 0,
-        createdAt: new Date().toISOString()
-      },
-      {
-        _id: '2',
-        name: 'Test PG',
-        description: 'this is test',
-        city: 'Chandigarh',
-        locality: 'Sector 23',
-        address: '23',
-        price: 5000,
-        type: 'girls',
-        images: [],
-        amenities: ['WiFi', 'AC', 'CCTV'],
-        verified: true,
-        featured: false,
-        rating: 0,
-        reviewCount: 0,
-        createdAt: new Date().toISOString()
-      },
-      {
-        _id: '3',
-        name: 'Yoyo Hostel',
-        description: 'this is very fun yoyo hostel',
-        city: 'Chandigarh',
-        locality: 'Sector 69',
-        address: '69',
-        price: 6969,
-        type: 'boys',
-        images: [],
-        amenities: ['WiFi', 'AC', 'Attached Bathroom'],
-        verified: true,
-        featured: false,
-        rating: 0,
-        reviewCount: 0,
-        createdAt: new Date().toISOString()
-      }
-    ];
+  // Function to clean and validate images
+  const cleanPGImages = (pg: PGListing): PGListing => {
+    // Create a copy to avoid mutating original
+    const cleanedPG = { ...pg };
+    
+    // Clean main images
+    if (cleanedPG.images && Array.isArray(cleanedPG.images)) {
+      // Remove duplicates, empty strings, and invalid URLs
+      cleanedPG.images = cleanedPG.images
+        .filter((img, index, self) => {
+          // Remove duplicates
+          return self.indexOf(img) === index;
+        })
+        .filter(img => {
+          // Remove empty strings and invalid images
+          if (!img || img.trim() === '') return false;
+          
+          // Keep only valid image URLs (http, https, or data URLs)
+          return img.startsWith('http') || img.startsWith('https') || img.startsWith('data:image');
+        });
+    } else {
+      cleanedPG.images = [];
+    }
+    
+    // Clean gallery images
+    if (cleanedPG.gallery && Array.isArray(cleanedPG.gallery)) {
+      cleanedPG.gallery = cleanedPG.gallery
+        .filter((img, index, self) => self.indexOf(img) === index)
+        .filter(img => {
+          if (!img || img.trim() === '') return false;
+          return img.startsWith('http') || img.startsWith('https') || img.startsWith('data:image');
+        });
+    }
+    
+    return cleanedPG;
   };
 
   const updateDisplayedPGs = (pgs: PGListing[]) => {
+    // Sort by featured first
     const sortedPGs = [...pgs].sort((a, b) => {
       if (a.featured && !b.featured) return -1;
       if (!a.featured && b.featured) return 1;
@@ -527,14 +504,29 @@ export function FeaturedPGs() {
   };
 
   const transformForPGCard = (pg: PGListing) => {
+    // Ensure we only pass valid, non-duplicate images
+    const validImages = pg.images?.filter((img, index, self) => 
+      img && 
+      img.trim() !== '' && 
+      (img.startsWith('http') || img.startsWith('https') || img.startsWith('data:image')) &&
+      self.indexOf(img) === index
+    ) || [];
+    
+    const validGallery = pg.gallery?.filter((img, index, self) => 
+      img && 
+      img.trim() !== '' && 
+      (img.startsWith('http') || img.startsWith('https') || img.startsWith('data:image')) &&
+      self.indexOf(img) === index
+    ) || [];
+    
     return {
       id: pg._id || pg.id || '',
       name: pg.name,
       slug: pg.slug || pg._id,
       description: pg.description,
       price: pg.price,
-      images: pg.images || [],
-      gallery: pg.gallery || [],
+      images: validImages,
+      gallery: validGallery,
       city: pg.city,
       locality: pg.locality,
       type: pg.type,
@@ -550,10 +542,11 @@ export function FeaturedPGs() {
       ac: pg.ac || pg.amenities?.some(a => a.toLowerCase().includes('ac')) || false,
       parking: pg.parking || pg.amenities?.some(a => a.toLowerCase().includes('park')) || false,
       distance: pg.distance,
+      // Add placeholder flag for components that need it
+      hasValidImages: validImages.length > 0
     };
   };
 
-  // Rest of your component remains the same...
   if (loading) {
     return (
       <section className="py-16 md:py-24 bg-gradient-to-b from-white to-orange-50/30">
@@ -583,7 +576,7 @@ export function FeaturedPGs() {
     );
   }
 
-  if (error && displayedPGs.length === 0) {
+  if (error || displayedPGs.length === 0) {
     return (
       <section className="py-16 md:py-24 bg-gradient-to-b from-white to-orange-50/30">
         <div className="container mx-auto px-4">
@@ -591,9 +584,11 @@ export function FeaturedPGs() {
             <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-orange-100 flex items-center justify-center">
               <AlertCircle className="h-8 w-8 text-orange-600" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {error ? 'Error Loading Data' : 'No PGs Available'}
+            </h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              {error}
+              {error || 'There are no accommodations available at the moment. Check back soon!'}
             </p>
             <Button 
               onClick={fetchPGs}
@@ -649,7 +644,10 @@ export function FeaturedPGs() {
                   </div>
                 </div>
               )}
-              <PGCard pg={transformForPGCard(pg)} index={index} />
+              <PGCard 
+                pg={transformForPGCard(pg)} 
+                index={index}
+              />
             </div>
           ))}
         </div>
