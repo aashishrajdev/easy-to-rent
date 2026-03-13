@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Star, AlertCircle, Wifi } from 'lucide-react';
+import { ArrowRight, Star, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PGCard } from '@/components/pg/PGCard';
 
 const API_URL = 'https://eassy-to-rent-backend.onrender.com';
 
-// Define the PG interface to match your backend structure
 interface PGListing {
   _id: string;
   id?: string;
@@ -33,6 +32,7 @@ interface PGListing {
   parking?: boolean;
   createdAt: string;
   distance?: string;
+  published?: boolean;
 }
 
 export function FeaturedPGs() {
@@ -51,8 +51,6 @@ export function FeaturedPGs() {
       setLoading(true);
       setError('');
       
-      console.log('🌐 Fetching PGs from:', `${API_URL}/api/pg?limit=20`);
-      
       const response = await fetch(`${API_URL}/api/pg?limit=20`, {
         method: 'GET',
         headers: {
@@ -63,44 +61,31 @@ export function FeaturedPGs() {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(`Failed to fetch listings`);
       }
       
       const result = await response.json();
-      console.log('📥 Response received:', result);
       
-      // Handle different response structures
       let pgs: PGListing[] = [];
       
       if (result.success) {
-        // Case 1: { success: true, data: { items: [...] } }
         if (result.data?.items && Array.isArray(result.data.items)) {
           pgs = result.data.items;
-          console.log(`✅ Found ${pgs.length} PGs from backend (paginated)`);
-          console.log(`📊 Total: ${result.data.total}, Page: ${result.data.page}/${result.data.pages}`);
         }
-        // Case 2: { success: true, data: [...] }
         else if (Array.isArray(result.data)) {
           pgs = result.data;
-          console.log(`✅ Found ${pgs.length} PGs from backend (direct array)`);
         }
-        // Case 3: { success: true, items: [...] }
         else if (Array.isArray(result.items)) {
           pgs = result.items;
-          console.log(`✅ Found ${pgs.length} PGs from backend (items array)`);
-        }
-        else {
-          console.warn('Unexpected data structure:', result);
         }
       } else {
         throw new Error(result.message || 'Failed to fetch PGs');
       }
       
-      // Filter to only show published PGs
       const publishedPGs = pgs.filter(pg => pg.published !== false);
       
       if (publishedPGs.length === 0) {
-        setError('No published PGs found in database');
+        setError('No PGs found');
         setAllPGs([]);
         setDisplayedPGs([]);
         return;
@@ -110,25 +95,20 @@ export function FeaturedPGs() {
       updateDisplayedPGs(publishedPGs);
       
     } catch (err: any) {
-      console.error('❌ Fetch error:', err);
-      setError(`Failed to load data: ${err.message}`);
+      setError('Failed to load data');
     } finally {
       setLoading(false);
     }
   };
 
   const updateDisplayedPGs = (pgs: PGListing[]) => {
-    // Sort by featured first, then by rating, then by createdAt
     const sortedPGs = [...pgs].sort((a, b) => {
-      // First sort by featured (true first)
       if (a.featured && !b.featured) return -1;
       if (!a.featured && b.featured) return 1;
       
-      // Then by rating (higher first)
       if ((a.rating || 0) > (b.rating || 0)) return -1;
       if ((a.rating || 0) < (b.rating || 0)) return 1;
       
-      // Then by createdAt (newest first)
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
     
@@ -136,12 +116,6 @@ export function FeaturedPGs() {
     setDisplayedPGs(sortedPGs.slice(0, initialCount));
   };
 
-  // Helper function to count PGs by type
-  const countByType = (type: string): number => {
-    return allPGs.filter(pg => pg.type === type).length;
-  };
-
-  // Helper function to transform PG data for PGCard
   const transformForPGCard = (pg: PGListing) => {
     return {
       id: pg._id || pg.id || '',
@@ -177,7 +151,6 @@ export function FeaturedPGs() {
             <div className="animate-pulse">
               <div className="h-4 w-24 bg-gray-200 rounded"></div>
               <div className="h-8 w-64 bg-gray-200 rounded mt-2"></div>
-              <div className="h-4 w-96 bg-gray-200 rounded mt-2"></div>
             </div>
             <div className="h-10 w-32 bg-gray-200 rounded animate-pulse"></div>
           </div>
@@ -230,30 +203,18 @@ export function FeaturedPGs() {
             <div className="inline-flex items-center gap-2 mb-3 px-4 py-2 bg-orange-100 text-orange-700 rounded-full border border-orange-200">
               <Star className="h-4 w-4 fill-orange-500" />
               <span className="text-sm font-medium uppercase tracking-wider">
-                Top Picks
+                Featured
               </span>
             </div>
             <h2 className="font-display text-3xl md:text-4xl font-bold text-gray-900 mt-2">
               Featured PG Accommodations
             </h2>
-            <p className="text-gray-600 mt-3 max-w-2xl">
-              {displayedPGs.length} premium stays loved by students for their comfort, location, and amenities. 
-              All verified and highly rated by residents.
-            </p>
-            <div className="flex items-center gap-2 mt-3 text-sm text-gray-500">
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-orange-500"></span>
-                <span className="font-medium">{allPGs.filter(pg => pg.featured).length}</span> Featured
-              </span>
-              <span className="text-gray-300">•</span>
-              <span>Total: {allPGs.length} PGs</span>
-            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
             <Link to="/pg">
               <Button className="bg-orange-600 hover:bg-orange-700 gap-2">
-                View All PGs
+                View All
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
@@ -267,7 +228,7 @@ export function FeaturedPGs() {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No PGs Available</h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              There are no accommodations available at the moment. Check back soon!
+              There are no accommodations available at the moment.
             </p>
           </div>
         ) : (
@@ -287,41 +248,9 @@ export function FeaturedPGs() {
                 </div>
               ))}
             </div>
-
-            <div className="mt-12 pt-8 border-t border-gray-200">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-center sm:text-left">
-                  <h4 className="font-semibold text-gray-900 mb-1">
-                    Need more options?
-                  </h4>
-                  <p className="text-sm text-gray-600">
-                    Browse our complete collection of verified PG accommodations
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  <Link to="/pg?type=boys">
-                    <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50">
-                       Boys PG ({countByType('boys')})
-                    </Button>
-                  </Link>
-                  <Link to="/pg?type=girls">
-                    <Button variant="outline" className="border-pink-300 text-pink-700 hover:bg-pink-50">
-                       Girls PG ({countByType('girls')})
-                    </Button>
-                  </Link>
-                  <Link to="/pg?type=co-ed">
-                    <Button variant="outline" className="border-purple-300 text-purple-700 hover:bg-purple-50">
-                       Co-ed PG ({countByType('co-ed')})
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
           </>
         )}
       </div>
     </section>
   );
 }
-
-
