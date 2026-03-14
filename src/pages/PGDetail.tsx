@@ -59,11 +59,12 @@ interface PGListing {
   distance?: string;
   published?: boolean;
   locality?: string;
+  roomTypes?: string[];
 }
 
 const PGDetail = () => {
   const { slug } = useParams();
-  const id = slug
+  const id = slug || "";
   const [currentImage, setCurrentImage] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
   const [selectedTab, setSelectedTab] = useState('overview');
@@ -82,39 +83,50 @@ const PGDetail = () => {
   const [availabilityPercentage, setAvailabilityPercentage] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   
-  // Use mock data instead of API for now
   const [pg, setPg] = useState<PGListing | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const API_URL = import.meta.env.VITE_API_URL || "https://eassy-to-rent-backend.onrender.com";
 
   useEffect(() => {
-    // Simulate API call with timeout
-    const timer = setTimeout(() => {
-      loadMockData();
+    if (!id) {
+      setError("No PG ID provided");
       setLoading(false);
-    }, 1000);
+      return;
+    }
 
-    return () => clearTimeout(timer);
+    const fetchPG = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch(`${API_URL}/api/pg/${id}`);
+        
+        if (!res.ok) {
+          throw new Error(`Failed to fetch PG: ${res.status}`);
+        }
+        
+        const data = await res.json();
+
+        if (data?.data) {
+          setPg(data.data);
+        } else {
+          throw new Error("PG data not found in response");
+        }
+      } catch (error) {
+        console.error("Error fetching PG:", error);
+        setError(error instanceof Error ? error.message : "Failed to load PG details");
+        
+        // Fallback to mock data if API fails
+        loadMockData();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPG();
   }, [id]);
-  const api_url = import.meta.env.VITE_API_URL
-  const url = new URL(`${api_url}/pg/${id}`)
-  
-
-
-  useEffect( ()=>{
-
-  const fetchData = async () =>{
-     try{
-      const pgData = await fetch(url)
-      const vals = await pgData.json()
-      setPg(vals.data)
-      console.log("pg ---- " , pg)
-     }catch(e){
-       console.log(e)
-     }
-  }
-
-  fetchData()
-  } , [])
   
   useEffect(() => {
     if (pg) {
@@ -157,7 +169,8 @@ const PGDetail = () => {
       ownerEmail: 'rajesh.cupg@gmail.com',
       createdAt: new Date().toISOString(),
       distance: '500m from CU Gate 1',
-      locality: 'Gate 1 Area'
+      locality: 'Gate 1 Area',
+      roomTypes: ['Single', 'Double', 'Triple']
     };
     
     setPg(mockPG);
@@ -195,7 +208,6 @@ const PGDetail = () => {
     });
   };
 
-
   const handleWhatsAppContact = () => {
     if (!pg) return;
     
@@ -230,7 +242,6 @@ const PGDetail = () => {
     window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
     toast.info('Opening location on Google Maps');
   };
-
 
   const handleShare = async () => {
     if (!pg) return;
@@ -276,8 +287,8 @@ const PGDetail = () => {
     );
   }
 
-  // If no PG data (shouldn't happen with mock data)
-  if (!pg) {
+  // Error state
+  if (error || !pg) {
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-b from-white to-orange-50/50">
         <Navbar />
@@ -286,9 +297,11 @@ const PGDetail = () => {
             <div className="w-24 h-24 mx-auto mb-6 bg-orange-100 rounded-full flex items-center justify-center">
               <Home className="h-12 w-12 text-orange-600" />
             </div>
-            <h1 className="font-display text-3xl font-bold text-gray-900 mb-4">PG Not Found</h1>
+            <h1 className="font-display text-3xl font-bold text-gray-900 mb-4">
+              {error ? "Error Loading PG" : "PG Not Found"}
+            </h1>
             <p className="text-gray-600 mb-8 max-w-md">
-              The PG accommodation you're looking for doesn't exist or has been removed.
+              {error || "The PG accommodation you're looking for doesn't exist or has been removed."}
             </p>
             <div className="flex gap-4 justify-center">
               <Link to="/pg">
@@ -309,7 +322,7 @@ const PGDetail = () => {
     );
   }
 
-  // Mock data for reviews and rooms
+  // Mock data for reviews and rooms (these can remain as fallbacks)
   const reviews = [
     {
       id: 1,
@@ -340,7 +353,13 @@ const PGDetail = () => {
     },
   ];
 
-  const roomDetails = [
+  const roomDetails = pg.roomTypes?.map((type, index) => ({
+    type,
+    price: pg.price * (index === 0 ? 1 : index === 1 ? 0.7 : 0.5),
+    size: index === 0 ? '120 sq ft' : index === 1 ? '180 sq ft' : '220 sq ft',
+    available: Math.floor(Math.random() * 5) + 1,
+    description: `${type} occupancy room with basic amenities`
+  })) || [
     { 
       type: 'Single Occupancy', 
       price: pg.price, 
@@ -545,7 +564,7 @@ const PGDetail = () => {
                     <div className="text-sm text-gray-600">Per Month</div>
                   </div>
                   <div className="bg-blue-50 rounded-lg p-3 text-center">
-                    <div className="text-xl font-bold text-blue-600">{pg.distance}</div>
+                    <div className="text-xl font-bold text-blue-600">{pg.distance || 'Near CU'}</div>
                     <div className="text-sm text-gray-600">From CU</div>
                   </div>
                   <div className="bg-green-50 rounded-lg p-3 text-center">
@@ -681,8 +700,8 @@ const PGDetail = () => {
                         </div>
                         <div>
                           <h3 className="font-bold text-gray-900">{pg.address}</h3>
-                          <p className="text-gray-600 mt-1">{pg.locality} • {pg.city}</p>
-                          <p className="text-orange-600 font-medium mt-2">{pg.distance}</p>
+                          <p className="text-gray-600 mt-1">{pg.locality || pg.city} • {pg.city}</p>
+                          <p className="text-orange-600 font-medium mt-2">{pg.distance || 'Near Chandigarh University'}</p>
                         </div>
                       </div>
                       
@@ -795,7 +814,7 @@ const PGDetail = () => {
                       <UsersIcon className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                      <p className="font-bold text-gray-900">{pg.ownerName}</p>
+                      <p className="font-bold text-gray-900">{pg.ownerName || 'Property Owner'}</p>
                       <p className="text-gray-600 text-sm">Property Owner</p>
                     </div>
                   </div>
