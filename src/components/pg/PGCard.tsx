@@ -455,7 +455,7 @@ Regards,
               className="h-7 border-muted-foreground/20 text-[11px] font-medium hover:bg-muted/50"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/pg/${pg.slug}`);
+                navigate(`/pg/${pg.id}`);
               }}
             >
               Details
